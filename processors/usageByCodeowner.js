@@ -7,16 +7,41 @@ import {
 } from "../utils/codeowners.js";
 
 /**
+ * Process a single component's usage data
+ * @param {string} componentName - Name of the component
+ * @param {Object} data - Component usage data
+ * @param {Set<string>} codeowners - Set of all codeowners
+ * @param {Map<string, string[]>} codeownerFilePaths - Map of codeowners to their file paths
+ * @returns {Object} Usage counts by codeowner
+ */
+const processComponentUsage = (componentName, data, codeowners, codeownerFilePaths) => {
+  const usage = {};
+
+  data.instances.forEach((instance) => {
+    const filePath = instance.location.file;
+    
+    for (const owner of codeowners) {
+      const ownerPaths = codeownerFilePaths.get(owner);
+      if (isFileOwnedByCodeowner(filePath, ownerPaths)) {
+        usage[owner] = (usage[owner] || 0) + 1;
+      }
+    }
+  });
+
+  return usage;
+};
+
+/**
  * Process component usage data and generate usage by codeowner
  * @param {Object} rawReport - Raw report from react-scanner
  * @returns {Promise<Object>} Component usage by codeowner
  */
 const processUsageByCodeowner = async (rawReport) => {
-  const usageByCodeowner = {};
+  // Get all codeowners and their file paths
   const codeowners = await getAllCodeowners();
   const codeownerFilePaths = new Map();
 
-  // Pre-fetch all file paths for each codeowner
+  // Pre-fetch all file paths for each codeowner in parallel
   await Promise.all(
     Array.from(codeowners).map(async (owner) => {
       const paths = await getFilepathsForCodeowner(owner);
@@ -24,28 +49,16 @@ const processUsageByCodeowner = async (rawReport) => {
     })
   );
 
-  // Process each component from the raw report
-  Object.entries(rawReport).forEach(([componentName, data]) => {
-    if (!usageByCodeowner[componentName]) {
-      usageByCodeowner[componentName] = {};
-    }
-
-    // Process each instance of the component
-    data.instances.forEach((instance) => {
-      const filePath = instance.location.file;
-
-      // Check which codeowner owns this file
-      for (const owner of codeowners) {
-        const ownerPaths = codeownerFilePaths.get(owner);
-        if (isFileOwnedByCodeowner(filePath, ownerPaths)) {
-          usageByCodeowner[componentName][owner] =
-            (usageByCodeowner[componentName][owner] || 0) + 1;
-        }
-      }
-    });
-  });
-
-  return usageByCodeowner;
+  // Process each component's usage data
+  return Object.entries(rawReport).reduce((usageByCodeowner, [componentName, data]) => {
+    usageByCodeowner[componentName] = processComponentUsage(
+      componentName,
+      data,
+      codeowners,
+      codeownerFilePaths
+    );
+    return usageByCodeowner;
+  }, {});
 };
 
 /**
@@ -55,23 +68,27 @@ const processUsageByCodeowner = async (rawReport) => {
  */
 const createCodeownerProcessor = (outputPath) => ({
   processor: async ({ prevResult }) => {
-    // Validate output path
     if (!outputPath) {
       throw new Error("Output path is required");
     }
 
     // Ensure output directory exists
     const outputDir = path.dirname(outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
+    !fs.existsSync(outputDir) && fs.mkdirSync(outputDir, { recursive: true });
 
-    console.debug(`Processing component usage by codeowner...`);
-    const results = await processUsageByCodeowner(prevResult);
-    console.debug(`Writing results to ${outputPath}...`);
-    fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
-    console.debug(`Results written successfully.`);
-    return results;
+    try {
+      console.debug("Processing component usage by codeowner...");
+      const results = await processUsageByCodeowner(prevResult);
+      
+      console.debug(`Writing results to ${outputPath}...`);
+      fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
+      console.debug("Results written successfully.");
+      
+      return results;
+    } catch (error) {
+      console.error("Error processing component usage:", error);
+      throw error;
+    }
   },
 });
 
