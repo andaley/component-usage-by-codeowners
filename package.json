@@ -8,5 +8,8 @@
   "devDependencies": {
     "commander": "^12.1.0",
     "react-scanner": "^1.2.0"
+  },
+  "scripts": {
+    "test-scan": "node index.js -c test-files/sample-codebase/react-scanner.config.js -o test-files/output/usage-by-codeowner.json --codeowners test-files/sample-codebase/CODEOWNERS"
   }
 }

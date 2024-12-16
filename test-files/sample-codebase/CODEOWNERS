@@ -1,0 +1,7 @@
+# Frontend team owns all frontend code
+/src/components/ @frontend-team
+src/components/UserProfile.jsx @accounts-team
+src/components/CustomButton.jsx @frontend-team
+
+# Design system team owns design system components
+/src/design-system/ @design-system-team
