@@ -76,11 +76,9 @@ function resolveOutputPath(outputPath) {
 
 async function main() {
   try {
-    // Load and validate configuration
     const userConfig = await loadConfig(options.config);
     debug("Loaded user config:", userConfig);
 
-    // Verify CODEOWNERS file exists
     const codeownersPath = path.resolve(options.codeowners);
     if (!fs.existsSync(codeownersPath)) {
       throw new Error(`CODEOWNERS file not found at ${options.codeowners}`);
@@ -88,11 +86,10 @@ async function main() {
     global.CODEOWNERS_PATH = codeownersPath;
     debug("CODEOWNERS path:", codeownersPath);
 
-    // Resolve output path
     const outputPath = resolveOutputPath(options.output);
     debug("Output path:", outputPath);
 
-    // Run react-scanner with our custom processor chain
+    // Run react-scanner with custom processor chain
     const config = {
       ...userConfig,
       processors: [
