@@ -114,7 +114,6 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-// Create a temporary file for raw report
 const tempOutputPath = path.join(outputDir, "temp-raw-report.json");
 debug("Temporary output path:", tempOutputPath);
 
