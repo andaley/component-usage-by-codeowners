@@ -1,0 +1,12 @@
+{
+  "name": "component-usage-by-codeowners",
+  "version": "1.0.0",
+  "description": "Scan for component usage by codeowners",
+  "main": "index.js",
+  "type": "module",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "commander": "^12.1.0",
+    "react-scanner": "^1.2.0"
+  }
+}

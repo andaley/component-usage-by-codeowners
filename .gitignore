@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Output directories
+output/
+
+# Debug files
+tmp/
+temp-raw-report.json
+
+# Editor directories and files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
