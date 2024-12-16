@@ -1,11 +1,8 @@
 import path from "path";
 import fs from "fs/promises";
 
-// Cache for file paths and codeowners
-const cache = {
-  filepaths: new Map(),
-  codeowners: null,
-};
+// Cache for parsed CODEOWNERS data
+const cache = new Map();
 
 /**
  * Read and parse the CODEOWNERS file
@@ -26,23 +23,32 @@ async function readCodeownersFile() {
  * @returns {Map<string, string[]>} Map of paths to owners
  */
 function parseCodeowners(content) {
-  const lines = content.split('\n');
   const pathOwners = new Map();
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const [pattern, ...owners] = trimmed.split(/\s+/);
+  content
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .forEach(line => {
+      const [pattern, ...owners] = line.split(/\s+/);
       if (pattern && owners.length > 0) {
         // Remove leading slash if present
-        const cleanPattern = pattern.startsWith('/') ? pattern.slice(1) : pattern;
+        const cleanPattern = pattern.replace(/^\/+/, '');
         pathOwners.set(cleanPattern, owners);
       }
-    }
-  }
+    });
 
   return pathOwners;
 }
+
+// Common glob pattern replacements
+const GLOB_PATTERNS = [
+  [/\*\*/g, '.*'],     // ** matches any characters
+  [/\*/g, '[^/]*'],    // * matches any characters except /
+  [/\?/g, '[^/]'],     // ? matches any single character except /
+  [/\//g, '\\/'],      // Escape forward slashes
+  [/\./g, '\\.'],      // Escape dots
+];
 
 /**
  * Convert a glob pattern to a regex pattern
@@ -51,12 +57,10 @@ function parseCodeowners(content) {
  */
 function globToRegex(pattern) {
   return new RegExp(
-    pattern
-      .replace(/\*\*/g, '.*')  // ** matches any characters
-      .replace(/\*/g, '[^/]*')  // * matches any characters except /
-      .replace(/\?/g, '[^/]')   // ? matches any single character except /
-      .replace(/\//g, '\\/')    // Escape forward slashes
-      .replace(/\./g, '\\.')    // Escape dots
+    GLOB_PATTERNS.reduce(
+      (result, [pattern, replacement]) => result.replace(pattern, replacement),
+      pattern
+    )
   );
 }
 
@@ -66,22 +70,23 @@ function globToRegex(pattern) {
  * @returns {Promise<string[]>} Array of filepaths
  */
 const getFilepathsForCodeowner = async (owner) => {
-  if (cache.filepaths.has(owner)) {
-    return cache.filepaths.get(owner);
+  const cacheKey = `paths:${owner}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
   }
 
   const content = await readCodeownersFile();
   const pathOwners = parseCodeowners(content);
-  const paths = [];
+  const ownerPaths = [];
 
   for (const [pattern, owners] of pathOwners.entries()) {
     if (owners.includes(owner)) {
-      paths.push(pattern);
+      ownerPaths.push(pattern);
     }
   }
 
-  cache.filepaths.set(owner, paths);
-  return paths;
+  cache.set(cacheKey, ownerPaths);
+  return ownerPaths;
 };
 
 /**
@@ -89,21 +94,18 @@ const getFilepathsForCodeowner = async (owner) => {
  * @returns {Promise<Set<string>>} Set of unique codeowners
  */
 const getAllCodeowners = async () => {
-  if (cache.codeowners) {
-    return cache.codeowners;
+  const CACHE_KEY = 'allOwners';
+  if (cache.has(CACHE_KEY)) {
+    return cache.get(CACHE_KEY);
   }
 
   const content = await readCodeownersFile();
   const pathOwners = parseCodeowners(content);
-  const owners = new Set();
+  const owners = new Set(
+    Array.from(pathOwners.values()).flat()
+  );
 
-  for (const ownerList of pathOwners.values()) {
-    for (const owner of ownerList) {
-      owners.add(owner);
-    }
-  }
-
-  cache.codeowners = owners;
+  cache.set(CACHE_KEY, owners);
   return owners;
 };
 
@@ -114,13 +116,8 @@ const getAllCodeowners = async () => {
  * @returns {boolean} True if the file is owned by the codeowner
  */
 const isFileOwnedByCodeowner = (filePath, ownerPaths) => {
-  // Remove any leading slashes and normalize path
   const normalizedPath = filePath.replace(/^\/+/, '');
-  
-  return ownerPaths.some(pattern => {
-    const regex = globToRegex(pattern);
-    return regex.test(normalizedPath);
-  });
+  return ownerPaths.some(pattern => globToRegex(pattern).test(normalizedPath));
 };
 
 export { getFilepathsForCodeowner, getAllCodeowners, isFileOwnedByCodeowner };
