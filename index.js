@@ -5,7 +5,6 @@ import scanner from "react-scanner";
 import path from "path";
 import fs from "fs";
 import { createCodeownerProcessor } from "./processors/usageByCodeowner.js";
-import { fileURLToPath } from "url";
 
 const DEFAULT_OUTPUT_FILENAME = "usage-by-codeowner.json";
 
@@ -23,14 +22,14 @@ program
   )
   .requiredOption("-o, --output <path>", "path to output directory or file")
   .requiredOption("--codeowners <path>", "path to CODEOWNERS file")
-  .option("--debug", "keep temporary files for debugging")
+  .option("--debug", "enable debug logging")
   .parse(process.argv);
 
 const options = program.opts();
 
 const debug = (...args) => {
   if (options.debug) {
-    console.log("[DEBUG]", ...args);
+    console.debug("[DEBUG]", ...args);
   }
 };
 
@@ -41,18 +40,15 @@ const debug = (...args) => {
  */
 async function loadConfig(configPath) {
   const resolvedPath = path.resolve(configPath);
-  const ext = path.extname(resolvedPath);
 
   try {
-    if (ext === ".js") {
-      // For .js files, we need to import them as modules
+    if (path.extname(resolvedPath) === ".js") {
       const configModule = await import(resolvedPath);
       return configModule.default || configModule;
-    } else {
-      // For .json files, we can read them directly
-      const configContent = fs.readFileSync(resolvedPath, "utf8");
-      return JSON.parse(configContent);
     }
+
+    const configContent = fs.readFileSync(resolvedPath, "utf8");
+    return JSON.parse(configContent);
   } catch (error) {
     throw new Error(`Error reading config file: ${error.message}`);
   }
@@ -66,90 +62,54 @@ async function loadConfig(configPath) {
 function resolveOutputPath(outputPath) {
   const resolvedPath = path.resolve(outputPath);
 
-  // Check if path exists and is a directory
+  // If path is an existing directory, append default filename
   if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isDirectory()) {
     return path.join(resolvedPath, DEFAULT_OUTPUT_FILENAME);
   }
 
-  // Check if path's parent directory exists and is a directory
+  // Create parent directory if it doesn't exist
   const parentDir = path.dirname(resolvedPath);
-  if (fs.existsSync(parentDir) && fs.statSync(parentDir).isDirectory()) {
-    return resolvedPath;
-  }
-
-  // If neither exists, treat the path as a file path and ensure its directory exists
-  const targetDir = path.dirname(resolvedPath);
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
+  !fs.existsSync(parentDir) && fs.mkdirSync(parentDir, { recursive: true });
 
   return resolvedPath;
 }
 
-// Read and parse the config file
-let userConfig;
-try {
-  userConfig = await loadConfig(options.config);
-} catch (error) {
-  console.error(error.message);
-  process.exit(1);
-}
+async function main() {
+  try {
+    // Load and validate configuration
+    const userConfig = await loadConfig(options.config);
+    debug("Loaded user config:", userConfig);
 
-// Verify CODEOWNERS file exists
-if (!fs.existsSync(path.resolve(options.codeowners))) {
-  console.error("Error: CODEOWNERS file not found at", options.codeowners);
-  process.exit(1);
-}
-
-// Resolve output path to absolute path, handling directories
-const outputPath = resolveOutputPath(options.output);
-debug("Output path:", outputPath);
-
-// Ensure output directory exists
-const outputDir = path.dirname(outputPath);
-debug("Output directory:", outputDir);
-
-if (!fs.existsSync(outputDir)) {
-  debug("Creating output directory");
-  fs.mkdirSync(outputDir, { recursive: true });
-}
-
-const tempOutputPath = path.join(outputDir, "temp-raw-report.json");
-debug("Temporary output path:", tempOutputPath);
-
-const config = {
-  ...userConfig,
-  processors: [["raw-report", { outputTo: tempOutputPath }]],
-};
-
-global.CODEOWNERS_PATH = path.resolve(options.codeowners);
-debug("CODEOWNERS path:", global.CODEOWNERS_PATH);
-
-// Run the scanner and process results
-scanner
-  .run(config)
-  .then(async () => {
-    try {
-      const rawReport = JSON.parse(fs.readFileSync(tempOutputPath, "utf8"));
-      debug("Raw report read successfully");
-
-      // Process the raw report using our processor
-      debug("Creating processor with output path:", outputPath);
-      const processor = createCodeownerProcessor(outputPath);
-      await processor.processor({ prevResult: rawReport });
-
-      // Clean up temp file unless in debug mode
-      if (!options.debug) {
-        fs.unlinkSync(tempOutputPath);
-      }
-
-      console.log("Component usage analysis completed successfully.");
-    } catch (error) {
-      console.error("Error processing results:", error);
-      process.exit(1);
+    // Verify CODEOWNERS file exists
+    const codeownersPath = path.resolve(options.codeowners);
+    if (!fs.existsSync(codeownersPath)) {
+      throw new Error(`CODEOWNERS file not found at ${options.codeowners}`);
     }
-  })
-  .catch((error) => {
-    console.error("Error running component usage analysis:", error);
+    global.CODEOWNERS_PATH = codeownersPath;
+    debug("CODEOWNERS path:", codeownersPath);
+
+    // Resolve output path
+    const outputPath = resolveOutputPath(options.output);
+    debug("Output path:", outputPath);
+
+    // Run react-scanner with our custom processor chain
+    const config = {
+      ...userConfig,
+      processors: [
+        "raw-report",
+        ({ prevResult }) => {
+          const processor = createCodeownerProcessor(outputPath);
+          return processor.processor({ prevResult });
+        },
+      ],
+    };
+
+    await scanner.run(config);
+    console.log("Component usage analysis completed successfully.");
+  } catch (error) {
+    console.error("Error:", error.message);
     process.exit(1);
-  });
+  }
+}
+
+main();
