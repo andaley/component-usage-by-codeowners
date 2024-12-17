@@ -28,9 +28,9 @@ npm run scan [options]
 ### Options
 
 - `-c, --config <path>` - Path to react-scanner config file (required)
-- `-o, --output <path>` - Output path for the report. Can be a file or directory
 - `--codeowners <path>` - Path to CODEOWNERS file (required)
-- `-d, --debug` - Enable debug logging
+- `-o, --output <path>` - (optional) Output path for the report. Can be a file or directory. Defaults to `./output/usage-by-codeowner.json`
+- `-d, --debug` - (optional) Enable debug logging
 
 ### Example
 

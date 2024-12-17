@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import { createCodeownerProcessor } from "./processors/usageByCodeowner.js";
 
+const DEFAULT_OUTPUT_DIR = "output";
 const DEFAULT_OUTPUT_FILENAME = "usage-by-codeowner.json";
 
 const program = new Command();
@@ -13,15 +14,18 @@ const program = new Command();
 program
   .name("usage-by-codeowner-scanner")
   .description(
-    "CLI tool to scan codebase for design system component usage by CODEOWNER"
+    "script to scan codebase for design system component usage by CODEOWNER"
   )
   .version("1.0.0")
   .requiredOption(
     "-c, --config <path>",
     "path to react-scanner config file (.js or .json)"
   )
-  .requiredOption("-o, --output <path>", "path to output directory or file")
   .requiredOption("--codeowners <path>", "path to CODEOWNERS file")
+  .option(
+    "-o, --output <path>",
+    "path to output directory or file (defaults to ./output/usage-by-codeowner.json)"
+  )
   .option("--debug", "enable debug logging")
   .parse(process.argv);
 
@@ -56,10 +60,18 @@ async function loadConfig(configPath) {
 
 /**
  * Resolve output path, handling both directory and file paths
- * @param {string} outputPath - User provided output path
+ * @param {string} [outputPath] - User provided output path (optional)
  * @returns {string} Resolved output file path
  */
 function resolveOutputPath(outputPath) {
+  // If no output path provided, use default in output directory
+  if (!outputPath) {
+    const defaultPath = path.join(process.cwd(), DEFAULT_OUTPUT_DIR, DEFAULT_OUTPUT_FILENAME);
+    const outputDir = path.dirname(defaultPath);
+    !fs.existsSync(outputDir) && fs.mkdirSync(outputDir, { recursive: true });
+    return defaultPath;
+  }
+
   const resolvedPath = path.resolve(outputPath);
 
   // If path is an existing directory, append default filename
@@ -103,6 +115,7 @@ async function main() {
 
     await scanner.run(config);
     console.log("Component usage analysis completed successfully.");
+    console.log(`Results written to ${outputPath}`);
   } catch (error) {
     console.error("Error:", error.message);
     process.exit(1);
