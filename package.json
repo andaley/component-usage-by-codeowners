@@ -5,12 +5,28 @@
   "main": "index.js",
   "type": "module",
   "license": "UNLICENSED",
-  "devDependencies": {
-    "commander": "^12.1.0",
-    "react-scanner": "^1.2.0"
-  },
   "scripts": {
     "scan": "node index.js",
     "test-scan": "node index.js -c test-files/sample-codebase/react-scanner.config.js -o test-files/output/usage-by-codeowner.json --codeowners test-files/sample-codebase/CODEOWNERS"
-  }
+  },
+  "bin": {
+    "component-usage-by-codeowners": "index.js"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "react-scanner": "^1.2.0"
+  },
+  "devDependencies": {
+    "debug": "^4.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andaley/component-usage-by-codeowners.git"
+  },
+  "keywords": [
+    "react-scanner",
+    "design-system"
+  ],
+  "author": "Adrianne Daley",
+  "homepage": "https://github.com/andaley/component-usage-by-codeowners#readme"
 }
