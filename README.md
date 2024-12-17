@@ -8,21 +8,10 @@ A node script built on top of [react-scanner](https://github.com/moroshko/react-
 - Maps component usage to teams based on CODEOWNERS file
 - Generates results in a JSON file
 
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/component-usage-by-codeowners.git
-
-# Install dependencies
-cd component-usage-by-codeowners
-npm install
-```
-
 ## Usage
 
 ```bash
-npm run scan [options]
+npx component-usage-by-codeowners [options]
 ```
 
 ### Options
@@ -32,10 +21,10 @@ npm run scan [options]
 - `-o, --output <path>` - (optional) Output path for the report. Can be a file or directory. Defaults to `./output/usage-by-codeowner.json`
 - `-d, --debug` - (optional) Enable debug logging
 
-### Example
+### Example Usage
 
 ```bash
-npm run scan -c react-scanner.config.js -o ./output/usage-by-codeowner.json --codeowners ./CODEOWNERS
+npx component-usage-by-codeowners -c react-scanner.config.js -o ./output/usage-by-codeowner.json --codeowners ./CODEOWNERS
 ```
 
 ## Configuration
@@ -69,7 +58,17 @@ Example output:
 }
 ```
 
-## Development
+## Local Development
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/component-usage-by-codeowners.git
+
+# Install dependencies
+cd component-usage-by-codeowners
+npm install
+```
 
 ### Testing
 
